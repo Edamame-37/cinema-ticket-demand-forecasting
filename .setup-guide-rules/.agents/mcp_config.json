@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "kaggle_mcp": {
+      "command": "python",
+      "args": [
+        "kaggle_mcp/server.py"
+      ]
+    }
+  }
+}
