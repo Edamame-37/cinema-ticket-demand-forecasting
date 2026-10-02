@@ -245,7 +245,7 @@ cells = [
         "    oof_cat[val_idx] = pred_cat\n",
         "\n",
         "    # 2. LIGHTGBM\n",
-        "    model_lgb = lgb.LGBMRegressor(n_estimators=600, learning_rate=0.05, objective='mae', min_data_in_leaf=50, cat_smooth=50, monotone_constraints=mc_tuple, random_state=42, n_jobs=-1, verbose=-1)\n",
+        "    model_lgb = lgb.LGBMRegressor(n_estimators=600, learning_rate=0.05, objective='mae', min_data_in_leaf=50, cat_smooth=50, random_state=42, n_jobs=-1, verbose=-1)\n",
         "    model_lgb.fit(X_train, y_train, sample_weight=w_train)\n",
         "    pred_lgb = np.clip(model_lgb.predict(X_val), 0, None)\n",
         "    oof_lgb[val_idx] = pred_lgb\n",
