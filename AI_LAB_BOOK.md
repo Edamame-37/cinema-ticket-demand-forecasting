@@ -12,6 +12,9 @@ Use this file to log all your experiments. This prevents context loss and ensure
 | `Exp03_Frankenstein_MetaEnsemble.ipynb` | Meta-Ensemble (LGBM, CatBoost, XGB) + NLP PCA | 0.49138 (MASE) | 0.75089 | **Kesuksesan:** Ekstraksi NLP mampu mereduksi dimensi teks dengan baik.<br>**Kegagalan (Over-Engineering):** Model buta kalender (*Weekend/Holidays*) dan gagal memprediksi target rasio `y/Sp` secara langsung. |
 | `Exp04_LogMonotonic.ipynb` | LightGBM Murni + Fisika Kalender & Pembobotan MASE (Sample Weights) | 0.7272 (MASE) | *(Menunggu Submit)* | **Kesuksesan Mutlak:** Model mencapai batas teoretis keakuratan generalisasi tanpa data bocor.<br>**Insight (Irreducible Error):** Skor 0.72 adalah batas mentok fisika data saat ini. |
 
+| `Exp05_StackingEnsemble.ipynb` | Stacking Ensemble (Cat, LGB, XGB) + SLSQP Bounded MASE Optimizer | 0.4524 (MASE) | 1.10 | **Kesuksesan Eksekusi:** Optimisasi SLSQP & Anti-Leak M5-M8 berhasil diimplementasikan.<br>**Kegagalan Fatal (Covariate Shift):** Skor Kaggle LB (1.10) hancur karena Mismatch pada fitur M9 (`total_show` & `screen_share_pct`). Model dilatih pakai data aktual masa depan, tapi dites pakai imputasi masa lalu. |
+
+
 ## Exp01 Post-Mortem & Error Analysis (Evaluasi Kesalahan Baseline)
 Berdasarkan hasil eksekusi M11 (Kaggle Score vs CV Score), terdapat jurang (*gap*) sebesar 0.71461. Berikut adalah analisis akar masalah dari kegagalan desain eksperimen pertama kita beserta solusinya:
 
@@ -92,3 +95,22 @@ Namun, mengapa skornya masih di angka 0.72 dan bukan 0.20?
 ## Important Directives
 1. **Never overwrite an existing experiment notebook**. Always create `Exp<XX>_...ipynb`.
 2. **Submission Throttling**: You have a daily submission limit. Only use `kaggle_submit` if your **Local CV Score** improves significantly over the previous best experiment. Otherwise, trust your CV score and move to the next iteration without submitting.
+## Exp05 Post-Mortem & Error Analysis (Tragedi Covariate Shift)
+Berdasarkan hasil eksekusi M11, skor Public LB adalah **1.10**, yang berbanding terbalik secara mengerikan dengan Local CV kita (**0.4524**). Kesenjangan ini mengindikasikan bahwa model gagal total dalam menggeneralisasi data masa depan. 
+
+Berikut adalah analisis penyebab utama terjadinya *Feature Shift* ekstrem ini:
+
+1. **Kanibalisme Data Masa Depan (Imputasi M9 vs Aktual M1-M8)**
+   - **Masalah:** Di tahap *training* (M1-M8), model dilatih secara sangat manja menggunakan nilai aktual `total_show` (dan turunannya seperti `screen_share_pct` serta `is_clashing_blockbuster`) dari hari ke-4 hingga ke-10. Namun, di dunia nyata kompetisi (M9 / `test.csv`), nilai-nilai masa depan ini **tidak diketahui**. Akibatnya, kita terpaksa mengimputasi data M9 menggunakan rata-rata dari hari ke-1 hingga ke-3 (masa lalu). 
+   - **Dampak:** XGBoost dan LightGBM berekspektasi bahwa fitur kanibalisme tersebut adalah fakta akurat. Ketika disuapi dengan angka tebakan (*imputasi*), persepsi pohon keputusan langsung kacau balau, membuat prediksi tiket melonjak tak terkendali.
+
+2. **Hilangnya Konstrain Monotonik Gravitasi Waktu**
+   - **Masalah:** Untuk menyelamatkan efektivitas Target Encoding pada CatBoost di M6, kita mencabut *Monotone Constraints* (penahan absolut bahwa tiket harus meluruh seiring hari). 
+   - **Dampak:** Tanpa konstrain fisik tersebut, CatBoost bisa dengan mudah memprediksi bahwa jumlah tiket pada hari ke-10 secara tak masuk akal melonjak jauh melampaui hari ke-4, hanya karena ada sedikit perubahan pada fitur cuaca atau hari libur.
+
+3. **Reaktivitas Berlebih pada Ekstraksi Cuaca & Squeezed**
+   - **Masalah:** Bobot fitur `is_squeezed` dan `weather_penalty_score` menjadi sangat besar (penting) di tahap *training*. Namun, saat kondisi cuaca bulan September (data *Test*) berbeda iklim, penalti ini berpotensi menghukum algoritma dengan pengurang yang terlalu agresif.
+
+**Solusi Exp06 (Langkah Perbaikan):**
+- **Strict Time-Series Causality:** Jika fitur aktual tidak ada di masa depan (`test.csv`), maka fitur tersebut HARUS DIMUSNAHKAN dari masa lalu saat *training*. Matriks *training* `X` harus murni hanya diisi oleh agregasi Day 1-3.
+- **Rasio Peluruhan (Decay Ratio Modeling):** Kita harus berhenti menyuruh model menebak `total_ticket` (angka mutlak) dan mulai menyuruhnya menebak `Decay Ratio` (persentase retensi penonton dari D3).
