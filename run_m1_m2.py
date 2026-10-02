@@ -100,7 +100,9 @@ cells = [
         "if 'train_df' in locals():\n", 
         "    dups = train_df.duplicated(subset=['movie_title', 'cinema_ids', 'date_show']).sum()\n", 
         "    print(f'Duplikasi: {dups}')\n", 
-        "    assert dups == 0, 'Ada duplikasi data!'\n", "\n", 
+        "    if dups > 0:\n",
+        "        print('Menghapus duplikasi...')\n",
+        "        train_df.drop_duplicates(subset=['movie_title', 'cinema_ids', 'date_show'], keep='first', inplace=True)\n", "\n", 
         "    if not pd.api.types.is_datetime64_any_dtype(train_df['date_show']):\n", 
         "        train_df['date_show'] = pd.to_datetime(train_df['date_show'])\n"
     ]},
