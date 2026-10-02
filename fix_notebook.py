@@ -239,7 +239,7 @@ cells = [
         "    X_val, y_val, sp_val = X.iloc[val_idx], y.iloc[val_idx], sp_vals.iloc[val_idx]\n",
         "\n",
         "    # 1. CATBOOST\n",
-        "    model_cat = cb.CatBoostRegressor(iterations=600, learning_rate=0.05, depth=6, loss_function='MAE', cat_features=cat_candidates, monotone_constraints=mc_tuple, verbose=0, random_seed=42)\n",
+        "    model_cat = cb.CatBoostRegressor(iterations=600, learning_rate=0.05, depth=6, loss_function='MAE', cat_features=cat_candidates, monotone_constraints=mc, verbose=0, random_seed=42)\n",
         "    model_cat.fit(X_train, y_train, sample_weight=w_train)\n",
         "    pred_cat = np.clip(model_cat.predict(X_val), 0, None)\n",
         "    oof_cat[val_idx] = pred_cat\n",
