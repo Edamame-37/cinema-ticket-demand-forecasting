@@ -1,0 +1,112 @@
+import json
+import os
+
+path = 'experiments/Exp05_StackingEnsemble/Exp05_StackingEnsemble.ipynb'
+
+cells = [
+    {"cell_type": "markdown", "metadata": {}, "source": ["# Eksperimen 05: Stacking Ensemble (Fase M1 & M2)\n"]},
+    {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": [
+        "import os\n",
+        "import pandas as pd\n",
+        "import numpy as np\n",
+        "\n",
+        "os.environ['PYTHONHASHSEED'] = '0'\n",
+        "np.random.seed(42)\n",
+        "\n",
+        "if 'train_df' not in locals():\n",
+        "    print('Memuat data...')\n",
+        "    train_df = pd.read_parquet('../../dataset/cleaned_dataset.parquet')\n",
+        "    print(f'Ukuran awal: {train_df.shape}')\n"
+    ]},
+    {"cell_type": "markdown", "metadata": {}, "source": ["## M1: Post-Preprocessing EDA\n"]},
+    {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": [
+        "if 'train_df' in locals():\n",
+        "    dups = train_df.duplicated(subset=['movie_title', 'cinema_ids', 'date_show']).sum()\n",
+        "    print(f'Duplikasi: {dups}')\n",
+        "    if dups > 0:\n",
+        "        print('Menghapus duplikasi...')\n",
+        "        train_df.drop_duplicates(subset=['movie_title', 'cinema_ids', 'date_show'], keep='first', inplace=True)\n",
+        "\n",
+        "    if not pd.api.types.is_datetime64_any_dtype(train_df['date_show']):\n",
+        "        train_df['date_show'] = pd.to_datetime(train_df['date_show'])\n",
+        "    print('Tahap M1 Selesai')\n"
+    ]},
+    {"cell_type": "markdown", "metadata": {}, "source": ["## M2: Rekayasa Fitur Hibrida (Cuaca, Sineas, Kanibalisme)\n"]},
+    {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": [
+        "if 'train_df' in locals():\n",
+        "    print('Mengekstrak fitur...')\n",
+        "    if 'total_show' in train_df.columns:\n",
+        "        train_df.drop(columns=['total_show'], inplace=True)\n",
+        "\n",
+        "    weather_df = pd.read_csv('../../dataset/weather_data.csv')\n",
+        "    weather_df['date_show'] = pd.to_datetime(weather_df['date_show'])\n",
+        "    train_df = train_df.merge(weather_df, on=['city_name', 'date_show'], how='left')\n",
+        "    train_df['rainfall_mm'] = train_df['rainfall_mm'].fillna(0)\n",
+        "    train_df['is_heavy_rain'] = train_df['is_heavy_rain'].fillna(0)\n",
+        "\n",
+        "    train_df['weather_penalty_score'] = train_df['is_heavy_rain'] * train_df['is_weekend']\n",
+        "    train_df['rain_intensity_impact'] = train_df['is_heavy_rain'] * train_df['rainfall_mm']\n",
+        "    train_df['is_squeezed'] = ((train_df['screen_share_pct'] < 15) & (train_df['is_clashing_blockbuster'] == 1)).astype('int8')\n",
+        "\n",
+        "    if 'release_date' in train_df.columns:\n",
+        "        train_df['release_date'] = pd.to_datetime(train_df['release_date'])\n",
+        "        train_df['day_since_release'] = (train_df['date_show'] - train_df['release_date']).dt.days + 1\n",
+        "    else:\n",
+        "        first_show = train_df.groupby('movie_title')['date_show'].min().reset_index()\n",
+        "        first_show.rename(columns={'date_show': 'inferred_release_date'}, inplace=True)\n",
+        "        train_df = train_df.merge(first_show, on='movie_title', how='left')\n",
+        "        train_df['day_since_release'] = (train_df['date_show'] - train_df['inferred_release_date']).dt.days + 1\n",
+        "    print('Fitur berhasil ditambahkan')\n"
+    ]},
+    {"cell_type": "markdown", "metadata": {}, "source": ["## M2: Transformasi Jendela Waktu (D1-D3) & Pre-Stacking Prep\n"]},
+    {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": [
+        "if 'train_df' in locals():\n",
+        "    print('Memulai perakitan jendela waktu (ini mungkin butuh beberapa detik)...')\n",
+        "    train_df.sort_values(by=['movie_title', 'cinema_ids', 'date_show'], inplace=True)\n",
+        "    train_df['day_idx'] = train_df.groupby(['movie_title', 'cinema_ids']).cumcount() + 1\n",
+        "\n",
+        "    pair_counts = train_df.groupby(['movie_title', 'cinema_ids']).size()\n",
+        "    valid_pairs = pair_counts[pair_counts >= 4].index\n",
+        "    df_valid = train_df.set_index(['movie_title', 'cinema_ids']).loc[valid_pairs].reset_index()\n",
+        "\n",
+        "    history = df_valid[df_valid['day_idx'] <= 3]\n",
+        "    # Optmized groupby agg to avoid hanging\n",
+        "    history_agg = history.groupby(['movie_title', 'cinema_ids'], observed=True).agg(\n",
+        "        d1_ticket=('total_ticket', lambda x: x.iloc[0] if len(x)>0 else np.nan),\n",
+        "        d2_ticket=('total_ticket', lambda x: x.iloc[1] if len(x)>1 else np.nan),\n",
+        "        d3_ticket=('total_ticket', lambda x: x.iloc[2] if len(x)>2 else np.nan),\n",
+        "        scale_sp=('total_ticket', lambda x: max(x.mean(), 1))\n",
+        "    ).reset_index()\n",
+        "\n",
+        "    history_agg['D3_D1_ratio'] = history_agg['d3_ticket'] / history_agg['d1_ticket'].replace(0, 1)\n",
+        "    p99 = history_agg['D3_D1_ratio'].quantile(0.99)\n",
+        "    history_agg['D3_D1_ratio'] = np.clip(history_agg['D3_D1_ratio'], a_min=0, a_max=p99)\n",
+        "\n",
+        "    targets = df_valid[(df_valid['day_idx'] >= 4) & (df_valid['day_idx'] <= 10)]\n",
+        "    train_final = targets.merge(history_agg, on=['movie_title', 'cinema_ids'], how='left')\n",
+        "\n",
+        "    for col in ['movie_title', 'cinema_ids', 'city_name', 'genre', 'age_rating']:\n",
+        "        if col in train_final.columns:\n",
+        "            train_final[col] = train_final[col].astype('category')\n",
+        "            \n",
+        "    print(f'Dimensi data final (siap latih): {train_final.shape}')\n",
+        "    display(train_final[['movie_title', 'day_since_release', 'total_ticket', 'scale_sp', 'D3_D1_ratio', 'weather_penalty_score']].head())\n"
+    ]}
+]
+
+notebook = {
+    "cells": cells,
+    "metadata": {
+        "kernelspec": {
+            "display_name": "Python 3",
+            "language": "python",
+            "name": "python3"
+        }
+    },
+    "nbformat": 4,
+    "nbformat_minor": 5
+}
+
+with open(path, 'w') as f:
+    json.dump(notebook, f, indent=1)
+print("Notebook fixed completely.")
