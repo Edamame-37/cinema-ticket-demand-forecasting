@@ -74,6 +74,26 @@ Namun, mengapa skornya masih di angka 0.72 dan bukan 0.20?
 2. **Kesuksesan Eksekusi Metrik & Pembobotan**
    - **Kemenangan:** Strategi memanipulasi target dengan pembagian $S_p$ (`y_scaled = total_ticket / Sp`) yang dipadukan dengan *Objective* MAE (L1 Loss) dan injeksi parameter `sample_weight = Sp` pada model *LightGBM* terbukti sangat brilian. Model berhasil dipaksa untuk mengoptimalkan diri secara khusus menaklukkan metrik MASE Kaggle tanpa mengorbankan stabilitas algoritma *Decision Tree*.
 
+## Exp05 Post-Mortem & Error Analysis (Tragedi Covariate Shift)
+Berdasarkan hasil eksekusi M11, skor Public LB adalah **1.10**, yang berbanding terbalik secara mengerikan dengan Local CV kita (**0.4524**). Kesenjangan ini mengindikasikan bahwa model gagal total dalam menggeneralisasi data masa depan. 
+
+Berikut adalah analisis penyebab utama terjadinya *Feature Shift* ekstrem ini:
+
+1. **Kanibalisme Data Masa Depan (Imputasi M9 vs Aktual M1-M8)**
+   - **Masalah:** Di tahap *training* (M1-M8), model dilatih secara sangat manja menggunakan nilai aktual `total_show` (dan turunannya seperti `screen_share_pct` serta `is_clashing_blockbuster`) dari hari ke-4 hingga ke-10. Namun, di dunia nyata kompetisi (M9 / `test.csv`), nilai-nilai masa depan ini **tidak diketahui**. Akibatnya, kita terpaksa mengimputasi data M9 menggunakan rata-rata dari hari ke-1 hingga ke-3 (masa lalu). 
+   - **Dampak:** XGBoost dan LightGBM berekspektasi bahwa fitur kanibalisme tersebut adalah fakta akurat. Ketika disuapi dengan angka tebakan (*imputasi*), persepsi pohon keputusan langsung kacau balau, membuat prediksi tiket melonjak tak terkendali.
+
+2. **Hilangnya Konstrain Monotonik Gravitasi Waktu**
+   - **Masalah:** Untuk menyelamatkan efektivitas Target Encoding pada CatBoost di M6, kita mencabut *Monotone Constraints* (penahan absolut bahwa tiket harus meluruh seiring hari). 
+   - **Dampak:** Tanpa konstrain fisik tersebut, CatBoost bisa dengan mudah memprediksi bahwa jumlah tiket pada hari ke-10 secara tak masuk akal melonjak jauh melampaui hari ke-4, hanya karena ada sedikit perubahan pada fitur cuaca atau hari libur.
+
+3. **Reaktivitas Berlebih pada Ekstraksi Cuaca & Squeezed**
+   - **Masalah:** Bobot fitur `is_squeezed` dan `weather_penalty_score` menjadi sangat besar (penting) di tahap *training*. Namun, saat kondisi cuaca bulan September (data *Test*) berbeda iklim, penalti ini berpotensi menghukum algoritma dengan pengurang yang terlalu agresif.
+
+**Solusi Exp06 (Langkah Perbaikan):**
+- **Strict Time-Series Causality:** Jika fitur aktual tidak ada di masa depan (`test.csv`), maka fitur tersebut HARUS DIMUSNAHKAN dari masa lalu saat *training*. Matriks *training* `X` harus murni hanya diisi oleh agregasi Day 1-3.
+- **Rasio Peluruhan (Decay Ratio Modeling):** Kita harus berhenti menyuruh model menebak `total_ticket` (angka mutlak) dan mulai menyuruhnya menebak `Decay Ratio` (persentase retensi penonton dari D3).
+
 ## Feature Engineering Ideas Backlog
 - **Idea 1 (Solusi `total_show` Leakage)**: Hapus fitur `total_show` dan `price_capacity_ratio` (karena bergantung pada `total_show`) dari fase *Training*.
 - **Idea 2 (Model Sekunder `total_show`)**: Alternatif dari Idea 1, buat model prediktor terpisah yang khusus menebak jumlah `total_show` di D4-D10.
@@ -95,22 +115,3 @@ Namun, mengapa skornya masih di angka 0.72 dan bukan 0.20?
 ## Important Directives
 1. **Never overwrite an existing experiment notebook**. Always create `Exp<XX>_...ipynb`.
 2. **Submission Throttling**: You have a daily submission limit. Only use `kaggle_submit` if your **Local CV Score** improves significantly over the previous best experiment. Otherwise, trust your CV score and move to the next iteration without submitting.
-## Exp05 Post-Mortem & Error Analysis (Tragedi Covariate Shift)
-Berdasarkan hasil eksekusi M11, skor Public LB adalah **1.10**, yang berbanding terbalik secara mengerikan dengan Local CV kita (**0.4524**). Kesenjangan ini mengindikasikan bahwa model gagal total dalam menggeneralisasi data masa depan. 
-
-Berikut adalah analisis penyebab utama terjadinya *Feature Shift* ekstrem ini:
-
-1. **Kanibalisme Data Masa Depan (Imputasi M9 vs Aktual M1-M8)**
-   - **Masalah:** Di tahap *training* (M1-M8), model dilatih secara sangat manja menggunakan nilai aktual `total_show` (dan turunannya seperti `screen_share_pct` serta `is_clashing_blockbuster`) dari hari ke-4 hingga ke-10. Namun, di dunia nyata kompetisi (M9 / `test.csv`), nilai-nilai masa depan ini **tidak diketahui**. Akibatnya, kita terpaksa mengimputasi data M9 menggunakan rata-rata dari hari ke-1 hingga ke-3 (masa lalu). 
-   - **Dampak:** XGBoost dan LightGBM berekspektasi bahwa fitur kanibalisme tersebut adalah fakta akurat. Ketika disuapi dengan angka tebakan (*imputasi*), persepsi pohon keputusan langsung kacau balau, membuat prediksi tiket melonjak tak terkendali.
-
-2. **Hilangnya Konstrain Monotonik Gravitasi Waktu**
-   - **Masalah:** Untuk menyelamatkan efektivitas Target Encoding pada CatBoost di M6, kita mencabut *Monotone Constraints* (penahan absolut bahwa tiket harus meluruh seiring hari). 
-   - **Dampak:** Tanpa konstrain fisik tersebut, CatBoost bisa dengan mudah memprediksi bahwa jumlah tiket pada hari ke-10 secara tak masuk akal melonjak jauh melampaui hari ke-4, hanya karena ada sedikit perubahan pada fitur cuaca atau hari libur.
-
-3. **Reaktivitas Berlebih pada Ekstraksi Cuaca & Squeezed**
-   - **Masalah:** Bobot fitur `is_squeezed` dan `weather_penalty_score` menjadi sangat besar (penting) di tahap *training*. Namun, saat kondisi cuaca bulan September (data *Test*) berbeda iklim, penalti ini berpotensi menghukum algoritma dengan pengurang yang terlalu agresif.
-
-**Solusi Exp06 (Langkah Perbaikan):**
-- **Strict Time-Series Causality:** Jika fitur aktual tidak ada di masa depan (`test.csv`), maka fitur tersebut HARUS DIMUSNAHKAN dari masa lalu saat *training*. Matriks *training* `X` harus murni hanya diisi oleh agregasi Day 1-3.
-- **Rasio Peluruhan (Decay Ratio Modeling):** Kita harus berhenti menyuruh model menebak `total_ticket` (angka mutlak) dan mulai menyuruhnya menebak `Decay Ratio` (persentase retensi penonton dari D3).
