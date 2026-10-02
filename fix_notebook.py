@@ -188,14 +188,32 @@ cells = [
         "\n",
         "print('\\nTahap M4 Selesai. Matriks Input siap untuk masuk ke arena Stacking Ensemble (M5)!')\n"
     ]},
-    {"cell_type": "markdown", "metadata": {}, "source": ["## M5: Pemodelan (Stacking Ensemble)\n", "Tujuan: Melatih CatBoost, LGBM, XGBoost via GroupKFold dengan MASE Hacking, lalu di-blend menggunakan Ridge Regression."]},
-    {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": [
-        "import gc\n",
-        "import numpy as np\n",
-        "import pandas as pd\n",
-        "from sklearn.model_selection import GroupKFold\n",
-        "from sklearn.linear_model import Ridge\n",
-        "import catboost as cb\n",
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## M5 - M8: GroupKFold Stacking & MASE Hacking\n",
+            "Bagian ini mengeksekusi pelatihan pemodelan tingkat lanjut menggunakan teknik *Stacking Ensemble*. Beberapa modifikasi pamungkas yang tertanam:\n",
+            "1. **M5 (GroupKFold & MAE):** Data dilatih dalam 5 *fold* berdasar `movie_title` untuk mencegah kebocoran data. Loss function diatur ke `MAE` dengan `sample_weight` berbasis skala MASE.\n",
+            "2. **M6 & M8 (Anti-Overfit & Bounding):** \n",
+            "    * `cat_smooth=50` digunakan pada LightGBM untuk mengatasi kardinalitas.\n",
+            "    * `max_depth=8` pada XGBoost.\n",
+            "    * Konstrain monotonik dicabut dari CatBoost untuk menyelamatkan *Target Encoding*.\n",
+            "3. **M7 (Leak Fix & SLSQP Meta-Model):** Kolom prediksi lama (`oof_meta`) dicegah masuk ke fitur (*Drop ignore*). Penggabungan Meta-Model tidak lagi menggunakan Ridge, melainkan **SLSQP Optimizer** dari Scipy yang secara murni meminimalkan kalkulasi fungsi MASE dengan batasan bobot positif berjumlah = 1."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "import gc\n",
+            "import numpy as np\n",
+            "import pandas as pd\n",
+            "from sklearn.model_selection import GroupKFold\n",
+            "from scipy.optimize import minimize\n",
+            "import catboost as cb\n",
         "import lightgbm as lgb\n",
         "import xgboost as xgb\n",
         "from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, mean_absolute_percentage_error\n",
@@ -321,8 +339,45 @@ cells = [
         "print('Koefisien Kepercayaan MASE Optimizer (SETELAH M8):')\n",
         "names = ['CAT', 'LGB', 'XGB']\n",
         "for name, coef in zip(names, final_weights):\n",
-        "    print(f' - {name}: {coef:.4f}')\n"
-    ]}
+        "    print(f' - {name}: {coef:.4f}')\n",
+        "\n",
+        "final_mase = mase_objective_final(final_weights)\n",
+        "print(f'\\n[FINAL OOF] Estimasi Stacking MASE Keseluruhan: {final_mase:.4f}')\n"
+    ]},
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "print('\\n========== M9: FINAL PREDICTIONS & SUBMISSION ==========')\n",
+            "# 1. Feature Alignment\n",
+            "X_test = test_final.drop(columns=['id', 'date_show', 'inferred_release_date', 'day_idx', 'total_ticket'], errors='ignore')\n",
+            "\n",
+            "# 2. Base Model Inference\n",
+            "print('Melakukan inferensi dengan model M8...')\n",
+            "pred_test_cat = np.clip(model_cat.predict(X_test), 0, None)\n",
+            "pred_test_lgb = np.clip(model_lgb.predict(X_test), 0, None)\n",
+            "pred_test_xgb = np.clip(model_xgb.predict(X_test), 0, None)\n",
+            "\n",
+            "X_meta_test = np.column_stack([pred_test_cat, pred_test_lgb, pred_test_xgb])\n",
+            "\n",
+            "# 3. Optimal Blending menggunakan Final Weights dari M8 SLSQP Optimizer\n",
+            "print('Menggabungkan prediksi dengan bobot rasio emas SLSQP...')\n",
+            "pred_test_final = np.clip(X_meta_test @ final_weights, 0, None)\n",
+            "\n",
+            "# 4. Generate Submission\n",
+            "submission = pd.DataFrame({\n",
+            "    'id': test_final['id'],\n",
+            "    'total_ticket': pred_test_final\n",
+            "})\n",
+            "\n",
+            "submission_path = 'submission.csv'\n",
+            "submission.to_csv(submission_path, index=False)\n",
+            "print(f'\\n[SUKSES] File submission Kaggle berhasil disimpan di: {submission_path}')\n",
+            "submission.head()\n"
+        ]
+    }
 ]
 
 notebook = {
