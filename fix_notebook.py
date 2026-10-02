@@ -9,6 +9,8 @@ cells = [
         "import os\n",
         "import pandas as pd\n",
         "import numpy as np\n",
+        "import matplotlib.pyplot as plt\n",
+        "import seaborn as sns\n",
         "\n",
         "os.environ['PYTHONHASHSEED'] = '0'\n",
         "np.random.seed(42)\n",
@@ -30,6 +32,17 @@ cells = [
         "    if not pd.api.types.is_datetime64_any_dtype(train_df['date_show']):\n",
         "        train_df['date_show'] = pd.to_datetime(train_df['date_show'])\n",
         "    print('Tahap M1 Selesai')\n"
+    ]},
+    {"cell_type": "markdown", "metadata": {}, "source": ["## M1: Visualisasi Distribusi Tiket Awal\n", "Tujuan: Memastikan tidak ada agregasi ganda yang lolos sebelum proses Sliding Window."]},
+    {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": [
+        "if 'train_df' in locals():\n",
+        "    plt.figure(figsize=(10, 5))\n",
+        "    sns.histplot(train_df['total_ticket'], bins=50, kde=True, color='teal')\n",
+        "    plt.title('Distribusi Total Tiket per Hari (Sebelum Sliding Window)')\n",
+        "    plt.xlim(0, train_df['total_ticket'].quantile(0.99))\n",
+        "    plt.xlabel('Total Ticket')\n",
+        "    plt.ylabel('Frekuensi')\n",
+        "    plt.show()\n"
     ]},
     {"cell_type": "markdown", "metadata": {}, "source": ["## M2: Rekayasa Fitur Hibrida (Cuaca, Sineas, Kanibalisme)\n"]},
     {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": [
@@ -70,7 +83,6 @@ cells = [
         "    df_valid = train_df.set_index(['movie_title', 'cinema_ids']).loc[valid_pairs].reset_index()\n",
         "\n",
         "    history = df_valid[df_valid['day_idx'] <= 3]\n",
-        "    # Optmized groupby agg to avoid hanging\n",
         "    history_agg = history.groupby(['movie_title', 'cinema_ids'], observed=True).agg(\n",
         "        d1_ticket=('total_ticket', lambda x: x.iloc[0] if len(x)>0 else np.nan),\n",
         "        d2_ticket=('total_ticket', lambda x: x.iloc[1] if len(x)>1 else np.nan),\n",
@@ -91,6 +103,31 @@ cells = [
         "            \n",
         "    print(f'Dimensi data final (siap latih): {train_final.shape}')\n",
         "    display(train_final[['movie_title', 'day_since_release', 'total_ticket', 'scale_sp', 'D3_D1_ratio', 'weather_penalty_score']].head())\n"
+    ]},
+    {"cell_type": "markdown", "metadata": {}, "source": ["## M2: Visualisasi Efektivitas Fitur Hibrida (Ablation Pre-check)\n", "Tujuan: Memverifikasi apakah cuaca ekstrim dan kanibalisme blockbuster benar-benar merusak penjualan tiket di hari tayang, serta menganalisis pola eksponensial peluruhan."]},
+    {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": [
+        "if 'train_final' in locals():\n",
+        "    fig, axes = plt.subplots(1, 3, figsize=(18, 5))\n",
+        "    \n",
+        "    # 1. Efek Cuaca Buruk\n",
+        "    sns.boxplot(x='weather_penalty_score', y='total_ticket', data=train_final, ax=axes[0], palette='Blues')\n",
+        "    axes[0].set_title('Efek Cuaca Akhir Pekan (Penalty) vs Tiket D4-D10')\n",
+        "    axes[0].set_ylim(0, 500)\n",
+        "    axes[0].set_xlabel('Weather Penalty (0=Aman, 1=Hujan Lebat)')\n",
+        "    \n",
+        "    # 2. Efek Kanibalisme\n",
+        "    sns.boxplot(x='is_squeezed', y='total_ticket', data=train_final, ax=axes[1], palette='Reds')\n",
+        "    axes[1].set_title('Kanibalisme Blockbuster vs Tiket D4-D10')\n",
+        "    axes[1].set_ylim(0, 500)\n",
+        "    axes[1].set_xlabel('Squeezed (0=Bebas, 1=Tergencet)')\n",
+        "    \n",
+        "    # 3. Distribusi Rasio D3/D1\n",
+        "    sns.histplot(train_final['D3_D1_ratio'].dropna(), bins=40, kde=True, ax=axes[2], color='orange')\n",
+        "    axes[2].set_title('Distribusi Rasio Peluruhan (D3/D1 Ratio)')\n",
+        "    axes[2].set_xlabel('D3/D1 Ratio (Clipped)')\n",
+        "    \n",
+        "    plt.tight_layout()\n",
+        "    plt.show()\n"
     ]}
 ]
 
@@ -109,4 +146,4 @@ notebook = {
 
 with open(path, 'w') as f:
     json.dump(notebook, f, indent=1)
-print("Notebook fixed completely.")
+print("Notebook fixed completely and visualizations added.")
