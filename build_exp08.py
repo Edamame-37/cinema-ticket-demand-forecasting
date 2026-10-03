@@ -132,6 +132,10 @@ num_features = ['ceil', 'd1_ticket', 'd2_ticket', 'd3_ticket', 'scale_sp', 'D3_D
                 'occupation_rate', 'runtime_minutes', 'director_popularity', 
                 'day_of_week', 'month', 'is_weekend', 'is_month_end', 'rainfall_mm', 'is_heavy_rain', 'day_since_release']
 
+# Simpan nilai asli scale_sp sebelum dinormalisasi
+train_final['sp_asli'] = train_final['scale_sp'].copy()
+test_final['sp_asli'] = test_final['scale_sp'].copy()
+
 # Imputasi Numeric & Standardisasi
 scaler = StandardScaler()
 for col in num_features:
@@ -149,7 +153,6 @@ for col in cat_features:
     test_final[col] = test_final[col].fillna('Unknown').astype(str)
     
     le = LabelEncoder()
-    # Menggabungkan untuk membuat vocabulary global
     le.fit(pd.concat([train_final[col], test_final[col]]))
     
     train_final[col] = le.transform(train_final[col])
@@ -158,13 +161,7 @@ for col in cat_features:
 
 # Target (Ratio)
 y = train_final['total_ticket'].values
-sp_vals = train_final['scale_sp'].values  # Perhatian: ini diambil SEBELUM scaler karena kita butuh nilai aslinya!
-# Kita buat variabel khusus untuk membalikkan skala target
-sp_vals_asli = train_profile.set_index(['movie_title', 'cinema_ids'])['scale_sp']
-train_final['sp_asli'] = train_final.set_index(['movie_title', 'cinema_ids']).index.map(sp_vals_asli)
 y_ratio = y / train_final['sp_asli'].values
-
-test_final['sp_asli'] = test_final.set_index(['movie_title', 'cinema_ids']).index.map(test_profile.set_index(['movie_title', 'cinema_ids'])['scale_sp']).fillna(1.0)
 
 print('Normalisasi dan Embedding Preparation Selesai!')'''
 ))
