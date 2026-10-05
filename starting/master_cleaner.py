@@ -6,7 +6,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # 1. Inisialisasi Direktori
-out_dir = '../dataset/dataset-05-10-26'
+out_dir = 'dataset/dataset-05-10-26'
 os.makedirs(out_dir, exist_ok=True)
 
 print("==== MASTER CLEANER MEMULAI OPERASI ====")
@@ -19,9 +19,9 @@ def parse_dates(df, col='date_show'):
 
 # A. Membersihkan train.csv, test.csv, test_history.csv
 print("[1/5] Memproses Data Utama (Train/Test)...")
-train = pd.read_csv('../dataset/train.csv')
-test = pd.read_csv('../dataset/test.csv')
-test_hist = pd.read_csv('../dataset/test_history.csv')
+train = pd.read_csv('dataset/train.csv')
+test = pd.read_csv('dataset/test.csv')
+test_hist = pd.read_csv('dataset/test_history.csv')
 
 train = parse_dates(train)
 test = parse_dates(test)
@@ -33,7 +33,7 @@ test_hist.to_csv(f'{out_dir}/test_history.csv', index=False)
 
 # B. Membersihkan Weather Data (Ekstrapolasi Masa Depan)
 print("[2/5] Memperbaiki Anomali Cuaca (Weather)...")
-weather = pd.read_csv('../dataset/weather_data.csv')
+weather = pd.read_csv('dataset/weather_data.csv')
 weather = parse_dates(weather)
 weather['date_show'] = pd.to_datetime(weather['date_show'])
 
@@ -52,19 +52,19 @@ weather.to_csv(f'{out_dir}/weather_data.csv', index=False)
 
 # C. Membersihkan Holidays & Ticket Prices
 print("[3/5] Memproses Kalender Liburan & Harga Tiket...")
-holidays = pd.read_csv('../dataset/holidays.csv')
+holidays = pd.read_csv('dataset/holidays.csv')
 if 'date' in holidays.columns:
     holidays['date'] = pd.to_datetime(holidays['date'], format='mixed').dt.strftime('%Y-%m-%d')
 holidays['holiday_name'] = holidays['holiday_name'].fillna('Not a Holiday')
 holidays['holiday_tipe'] = holidays['holiday_tipe'].fillna('normal')
 holidays.to_csv(f'{out_dir}/holidays.csv', index=False)
 
-tickets = pd.read_csv('../dataset/ticket_prices.csv')
+tickets = pd.read_csv('dataset/ticket_prices.csv')
 tickets.to_csv(f'{out_dir}/ticket_prices.csv', index=False)
 
 # D. Membersihkan Movies (Sutradara & Hype)
 print("[4/5] Memproses Meta-Data Film (Movies)...")
-movies = pd.read_csv('../dataset/new/movie-right-director.csv')
+movies = pd.read_csv('dataset/new/movie-right-director.csv')
 # Imputasi Missing Values
 movies['age_rating'] = movies['age_rating'].fillna(movies['age_rating'].mode()[0])
 movies['runtime_minutes'] = movies['runtime_minutes'].fillna(movies['runtime_minutes'].median())
