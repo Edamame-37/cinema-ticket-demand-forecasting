@@ -207,6 +207,25 @@ meta_model.fit(stack_X_train, y_log_ratio)
 print(f"Bobot CatBoost: {meta_model.coef_[0]:.4f}")
 print(f"Bobot LightGBM: {meta_model.coef_[1]:.4f}")
 
+# Evaluasi Metrik OOF (Out of Fold)
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+oof_log_ratio_pred = meta_model.predict(stack_X_train)
+oof_ratio_pred = np.expm1(oof_log_ratio_pred)
+oof_ticket_pred = (oof_ratio_pred * (full_train['S_p'] + 1.0)).clip(lower=0).round().astype(int)
+
+y_true = full_train['total_ticket']
+naive_pred = full_train['S_p']
+
+rmse = np.sqrt(mean_squared_error(y_true, oof_ticket_pred))
+mae = mean_absolute_error(y_true, oof_ticket_pred)
+naive_mae = mean_absolute_error(y_true, naive_pred)
+mase = mae / (naive_mae + 1e-6)
+
+print(f"\\n=== HASIL EVALUASI OOF ===")
+print(f"OOF RMSE: {rmse:.4f}")
+print(f"OOF MASE (relatif terhadap S_p): {mase:.4f}")
+print(f"==========================\\n")
+
 # Prediksi Final (dalam bentuk Log Ratio)
 test_log_ratio_pred = meta_model.predict(stack_X_test)
 
