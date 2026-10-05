@@ -26,7 +26,7 @@ warnings.filterwarnings('ignore')
 print("Libraries Loaded.")"""
 
 code_load = """# 1. Load Cleaned Datasets
-base_dir = '../../dataset/dataset-05-10-26'
+base_dir = 'dataset/dataset-05-10-26'
 
 train = pd.read_csv(f'{base_dir}/train.csv')
 test_hist = pd.read_csv(f'{base_dir}/test_history.csv')
@@ -85,45 +85,48 @@ test_df = merge_metadata(test)
 print("Selesai.")"""
 
 code_feature = """# 3. Log-Ratio Targeting & Feature Engineering
-def calculate_sp_and_ratios(df, is_train=True):
-    df = df.sort_values(['movie_title', 'city_name', 'cinema_ids', 'date_show']).reset_index(drop=True)
-    df['movie_age_days'] = df.groupby(['movie_title', 'city_name', 'cinema_ids'])['date_show'].rank(method='dense', ascending=True).astype(int)
-    
-    early_days = df[df['movie_age_days'] <= 3]
-    sp_map = early_days.groupby(['movie_title', 'city_name', 'cinema_ids'])['total_ticket'].mean().reset_index()
-    sp_map.rename(columns={'total_ticket': 'S_p'}, inplace=True)
-    
-    df = df.merge(sp_map, on=['movie_title', 'city_name', 'cinema_ids'], how='left')
-    df['S_p'] = df['S_p'].fillna(df.groupby('movie_title')['S_p'].transform('median'))
-    df['S_p'] = df['S_p'].fillna(df['S_p'].median())
-    
-    if is_train:
-        # PENYEMPURNAAN 2: Log-Ratio Transform untuk meredam pencilan (outlier rasio)
-        # Ratio murni (y / S_p) bisa meledak jadi 50x jika S_p kecil tapi tiba-tiba ada rombongan
-        # log1p akan mengkompresi lonjakan tersebut.
-        df['target_log_ratio'] = np.log1p(df['total_ticket'] / (df['S_p'] + 1.0))
-    
-    # Ekstraksi Fitur
-    df['month'] = df['date_show'].dt.month
-    df['is_weekend'] = df['day_name'].isin(['saturday', 'sunday']).astype(int)
-    df['is_holiday'] = (df['holiday_tipe'] == 'holiday').astype(int)
-    
-    # Interaksi Fitur
-    df['star_power_x_runtime'] = df['star_power_score'] * df['runtime_minutes']
-    
-    # Hapus fitur beracun
-    drop_cols = ['screen_share_pct', 'cinema_daily_total_shows', 'max_single_movie_shows', 'is_clashing_blockbuster']
-    df.drop(columns=[c for c in drop_cols if c in df.columns], inplace=True)
-    
-    return df
-
 print("Menghitung S_p dan Log-Rasio Penurunan...")
-train_df = calculate_sp_and_ratios(train_df, is_train=True)
-test_hist_df = calculate_sp_and_ratios(test_hist_df, is_train=True)
-test_df = calculate_sp_and_ratios(test_df, is_train=False)
 
-full_train = pd.concat([train_df, test_hist_df], ignore_index=True)
-full_train = full_train[full_train['movie_age_days'] > 3].reset_index(drop=True)
+train_df['is_test'] = 0
+test_hist_df['is_test'] = 0
+test_df['is_test'] = 1
+
+all_df = pd.concat([train_df, test_hist_df, test_df], ignore_index=True)
+
+# Urutkan
+all_df = all_df.sort_values(['movie_title', 'city_name', 'cinema_ids', 'date_show']).reset_index(drop=True)
+all_df['movie_age_days'] = all_df.groupby(['movie_title', 'city_name', 'cinema_ids'])['date_show'].rank(method='dense', ascending=True).astype(int)
+
+# Hitung S_p HANYA dari data yang memiliki total_ticket (is_test == 0)
+early_days = all_df[(all_df['movie_age_days'] <= 3) & (all_df['is_test'] == 0)]
+sp_map = early_days.groupby(['movie_title', 'city_name', 'cinema_ids'])['total_ticket'].mean().reset_index()
+sp_map.rename(columns={'total_ticket': 'S_p'}, inplace=True)
+
+all_df = all_df.merge(sp_map, on=['movie_title', 'city_name', 'cinema_ids'], how='left')
+
+# Fallback S_p jika ada yang kosong
+all_df['S_p'] = all_df['S_p'].fillna(all_df.groupby('movie_title')['S_p'].transform('median'))
+all_df['S_p'] = all_df['S_p'].fillna(all_df['S_p'].median())
+
+# Target Transformasi (Hanya untuk is_test == 0)
+all_df['target_log_ratio'] = np.where(all_df['is_test'] == 0, 
+                                      np.log1p(all_df['total_ticket'] / (all_df['S_p'] + 1.0)), 
+                                      np.nan)
+
+# Ekstraksi Fitur
+all_df['month'] = all_df['date_show'].dt.month
+all_df['is_weekend'] = all_df['day_name'].isin(['saturday', 'sunday']).astype(int)
+all_df['is_holiday'] = (all_df['holiday_tipe'] == 'holiday').astype(int)
+all_df['star_power_x_runtime'] = all_df['star_power_score'] * all_df['runtime_minutes']
+
+# Hapus fitur beracun
+drop_cols = ['screen_share_pct', 'cinema_daily_total_shows', 'max_single_movie_shows', 'is_clashing_blockbuster']
+all_df.drop(columns=[c for c in drop_cols if c in all_df.columns], inplace=True)
+
+# Split kembali
+full_train = all_df[(all_df['is_test'] == 0) & (all_df['movie_age_days'] > 3)].reset_index(drop=True)
+test_df = all_df[all_df['is_test'] == 1].reset_index(drop=True)
+
 print(f"Data Pelatihan Siap: {full_train.shape}")"""
 
 code_train = """# 4. Anti-Overfit Model Training
@@ -134,6 +137,17 @@ features = [
     'genre', 'age_rating', 'director', 'city_name', 'day_name'
 ]
 cat_features = ['genre', 'age_rating', 'director', 'city_name', 'day_name']
+
+# SAFETY NET: Mencegah CatBoost Crash karena NaN di Categorical Features
+for c in cat_features:
+    full_train[c] = full_train[c].fillna('Unknown').astype(str)
+    test_df[c] = test_df[c].fillna('Unknown').astype(str)
+    
+# SAFETY NET: Numerics
+for c in features:
+    if c not in cat_features:
+        full_train[c] = full_train[c].fillna(0.0)
+        test_df[c] = test_df[c].fillna(0.0)
 
 X = full_train[features]
 y_log_ratio = full_train['target_log_ratio']
