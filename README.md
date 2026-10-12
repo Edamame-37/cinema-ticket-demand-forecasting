@@ -68,26 +68,44 @@ The pipeline ingests unjoined, cleaned relational datasets structured as follows
 ## 4. Modeling Methodology
 
 ```mermaid
-flowchart TD
-    A["<b>Data Ingestion & Normalization</b><br/>• Title Regex Normalization & Relational Join<br/>• Opening Profile Extraction (S_p, D3/D1, Capacity)"]
-    --> B["<b>Feature Matrix Assembly</b><br/>• Calendar Dynamics (Day of Week, Weekend, Holidays)<br/>• Sentiment Signals (TMDB Rating, Net WOM Sentiment)<br/>• Meteorological Penalty (Precipitation × Weekend)<br/>• Relative Temporal Position (Days Elapsed Since Release)"]
-    --> C["<b>Strict Cross-Validation Architecture</b><br/>5-Fold GroupKFold Partitioned by Unique Movie Titles"]
-    
-    C --> D1["<b>LightGBM Regressor</b><br/>• Unweighted L1 / MAE Objective<br/>• Target Ratio Formulation: r = y / S_p<br/>• Categorical Smoothing Regularizer"]
-    C --> D2["<b>XGBoost Regressor</b><br/>• Strict Monotonic Constraints (-1 on Elapsed Days)<br/>• Word-of-Mouth Decay Damping"]
-    
-    D1 --> E["<b>SLSQP Meta-Optimization & Blending</b><br/>• Sequential Least Squares Programming Calibration<br/>• Convex Variance-Reduction Multi-Model Ensemble"]
-    D2 --> E
-    
-    E --> F["<b>Final Demand Inference</b><br/>Scale Reconstruction: Total Tickets = Ratio × S_p"]
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'background': 'transparent',
+    'mainBkg': 'transparent',
+    'nodeBorder': '#388bfd',
+    'clusterBkg': 'transparent',
+    'clusterBorder': '#30363d',
+    'lineColor': '#58a6ff',
+    'textColor': '#e6edf3',
+    'primaryColor': 'transparent',
+    'primaryTextColor': '#e6edf3',
+    'primaryBorderColor': '#388bfd',
+    'secondaryColor': 'transparent',
+    'secondaryTextColor': '#e6edf3',
+    'secondaryBorderColor': '#238636',
+    'tertiaryColor': 'transparent',
+    'tertiaryTextColor': '#e6edf3',
+    'tertiaryBorderColor': '#a371f7'
+  }
+}}%%
+flowchart LR
+    subgraph S1 ["1. Data & Preprocessing"]
+        A["<b>Ingestion & Normalization</b><br/>• Title Regex Normalization<br/>• Relational Metadata Joins<br/>• Scale Extraction (S_p)"]
+        --> B["<b>Feature Matrix Assembly</b><br/>• Calendar Dynamics (DOW, Weekend)<br/>• Sentiment & Net WOM Signals<br/>• Weather Penalty (Precip × W/E)<br/>• Temporal Position (Day 4–10)"]
+    end
 
-    style A fill:#f8fafc,stroke:#64748b,stroke-width:1px
-    style B fill:#f8fafc,stroke:#64748b,stroke-width:1px
-    style C fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
-    style D1 fill:#f0fdf4,stroke:#22c55e,stroke-width:1px
-    style D2 fill:#f0fdf4,stroke:#22c55e,stroke-width:1px
-    style E fill:#faf5ff,stroke:#a855f7,stroke-width:2px
-    style F fill:#fff7ed,stroke:#f97316,stroke-width:2px
+    subgraph S2 ["2. Cross-Validation & Modeling"]
+        B --> C["<b>Strict CV Strategy</b><br/>5-Fold GroupKFold (by Title)<br/>Zero Out-of-Sample Leakage"]
+        C --> D1["<b>LightGBM Regressor</b><br/>• Unweighted L1 Ratio Loss (y/S_p)<br/>• Categorical Regularization"]
+        C --> D2["<b>XGBoost Regressor</b><br/>• Monotonic Lifespan Decay (-1)<br/>• WOM Sentiment Direction (+1)"]
+    end
+
+    subgraph S3 ["3. Blending & Production"]
+        D1 --> E["<b>SLSQP Meta-Optimization</b><br/>• Constrained L1 Solver<br/>• Convex Ensembling"]
+        D2 --> E
+        E --> F["<b>Final Inference</b><br/>Tickets = Predicted Ratio × S_p"]
+    end
 ```
 
 ### 4.1 Domain-Guided Monotonic Constraints
