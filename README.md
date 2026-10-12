@@ -139,12 +139,12 @@ The development of the forecasting architecture progressed through eighteen syst
 | `Exp07` | Fractional Ratio Modeling & Competitor Pruning | 0.4472 | 0.6252 | Fundamental breakthrough: ratio targeting resolves tree extrapolation limits. |
 | `Exp08` | Deep Learning Tabular Entity Embeddings | 0.4285 | ~0.8000 | High-dimensional embedding memorization failed under distribution shift. |
 | `Exp10` | Star Power Integration & Local Ratios | 0.4610 | 0.6808 | Missing capacity features and national median imputation inflated small venues. |
-| `Exp11` | Global Age Tracking with Raw Ticket MAE | 0.9810 | Did Not Deploy | Direct count regression biased models toward mega-theaters, ignoring small cinemas. |
+| `Exp11` | Global Age Tracking with Raw Ticket MAE | 0.9810 | Did Not Deployed | Direct count regression biased models toward mega-theaters, ignoring small cinemas. |
 | `Exp13` | Exact MASE Equivalence via Weighted Loss | 0.4410 | 0.66855 | Sample-weighting by $S_p$ degraded unweighted macro-averaged test metrics. |
-| `Exp14` | The Flawless Zenith (Strict Days 4–10 Horizon) | 0.4474 | 0.62822 | Establishing unweighted ratio regression with monotonic bounds. |
+| `Exp14` | Strict Days 4–10 Horizon with Unweighted Ratio MAE | 0.4474 | 0.62822 | Establishing unweighted ratio regression with monotonic bounds. |
 | `Exp16` | TMDB Sentiment & Regex Title Cleaning | 0.4349 | 0.64242 | 100% metadata join achieved; identified weekday target encoding distortion. |
 | `Exp17` | Clean WOM Modeling & Bounded Golden Blend | 0.4441 | 0.62707 | Purging static target encoding restored natural weekday decay dynamics. |
-| `Exp18` | Final Zenith Grandmaster Trio Blend | 0.4390 | Optimal | Analytical synthesis of Exp07, Exp14, and Exp17 maximizing variance reduction. |
+| `Exp18` | Trio Ensemble Convex Blend | 0.4390 | Did Not Deployed | Analytical synthesis of Exp07, Exp14, and Exp17 maximizing variance reduction. |
 
 ---
 
@@ -156,7 +156,7 @@ The repository enforces strict separation of concerns and standard file naming p
 ├── README.md                                  # Enterprise project documentation
 ├── AI_LAB_BOOK.md                             # Comprehensive technical lab log and post-mortems
 ├── .gitignore                                 # Git exclusion rules
-├── submission_final_zenith.csv                # Production benchmark forecast output
+├── submission_final_ensemble.csv              # Production benchmark forecast output
 │
 ├── dataset/                                   # Cleaned, unjoined relational source files
 │   ├── train.csv                              # Historical screening logs
@@ -171,8 +171,8 @@ The repository enforces strict separation of concerns and standard file naming p
 │
 └── experiments/                               # Modular experiment containers
     ├── Exp01_BaselineLGBM/                    # Exp01 notebook and submission artifact
-    ├── Exp02_FixLeakageLGBM/                  # Exp02 notebook and submission artifact
-    ├── Exp03_Frankenstein_MetaEnsemble/       # Exp03 notebook and submission artifact
+    ├── Exp02_GroupKFold_AntiLeakage/          # Exp02 notebook and submission artifact
+    ├── Exp03_MetaEnsemble_NLPPCA/             # Exp03 notebook and submission artifact
     ├── Exp04_LogMonotonic/                    # Exp04 notebook and submission artifact
     ├── Exp05_StackingEnsemble/                # Exp05 notebook and submission artifact
     ├── Exp06_StrictCausalityStacking/          # Exp06 notebook and submission artifact
@@ -180,14 +180,14 @@ The repository enforces strict separation of concerns and standard file naming p
     ├── Exp08_DeepLearningEmbeddings/          # Exp08 notebook and submission artifact
     ├── Exp09_HybridBlending/                  # Exp09 notebook and submission artifact
     ├── Exp10_StarPower_RatioStacking/         # Exp10 notebook and submission artifact
-    ├── Exp11_GlobalAge_MAESacking/            # Exp11 notebook and submission artifact
-    ├── Exp12_PerfectRatio/                    # Exp12 notebook and submission artifact
-    ├── Exp13_TheUltimateFix/                  # Exp13 notebook and submission artifact
-    ├── Exp14_TheFlawlessZenith/               # Exp14 notebook and submission artifact
+    ├── Exp11_GlobalAge_RawCountMAE/           # Exp11 notebook and submission artifact
+    ├── Exp12_CapacityLogRatio/                # Exp12 notebook and submission artifact
+    ├── Exp13_WeightedMASE_ExactScaling/       # Exp13 notebook and submission artifact
+    ├── Exp14_StrictHorizon_UnweightedMAE/     # Exp14 notebook and submission artifact
     ├── Exp15_FeatureCrossTargetEncoding/      # Exp15 notebook and submission artifact
-    ├── Exp16_WOM_Decay_Zenith/                # Exp16 notebook and submission artifact
-    ├── Exp17_TheCleanWOMZenith/               # Exp17 notebook and submission artifact
-    └── Exp18_FinalZenith_GrandmasterBlend/    # Exp18 notebook and submission artifact
+    ├── Exp16_TMDB_WordOfMouth_Decay/          # Exp16 notebook and submission artifact
+    ├── Exp17_CleanWOM_GoldenBlend/            # Exp17 notebook and submission artifact
+    └── Exp18_TrioEnsemble_ConvexBlend/        # Exp18 notebook and submission artifact
 ```
 
 ---
@@ -205,13 +205,14 @@ pip install numpy pandas scipy scikit-learn lightgbm xgboost catboost
 
 ### 7.3 Reproducing Model Execution
 All experimental notebooks are fully self-contained and sequentially runnable:
-1. Navigate to the desired experiment container, e.g., `experiments/Exp17_TheCleanWOMZenith/`.
-2. Open and execute `Exp17_TheCleanWOMZenith.ipynb` using Jupyter Notebook or JupyterLab:
+1. Navigate to the desired experiment container, e.g., `experiments/Exp17_CleanWOM_GoldenBlend/`.
+2. Open and execute `Exp17_CleanWOM_GoldenBlend.ipynb` using Jupyter Notebook or JupyterLab:
    ```bash
-   jupyter notebook experiments/Exp17_TheCleanWOMZenith/Exp17_TheCleanWOMZenith.ipynb
+   jupyter notebook experiments/Exp17_CleanWOM_GoldenBlend/Exp17_CleanWOM_GoldenBlend.ipynb
    ```
 3. To generate the final ensemble synthesis, execute:
    ```bash
-   jupyter notebook experiments/Exp18_FinalZenith_GrandmasterBlend/Exp18_FinalZenith_GrandmasterBlend.ipynb
+   jupyter notebook experiments/Exp18_TrioEnsemble_ConvexBlend/Exp18_TrioEnsemble_ConvexBlend.ipynb
    ```
-   The generated artifact will output directly to `submission_final_zenith.csv`.
+   The generated artifact will output directly to `submission_final_ensemble.csv`.
+
