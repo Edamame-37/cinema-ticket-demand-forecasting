@@ -8,3 +8,8 @@ catboost_info/
 __pycache__/
 .ipynb_checkpoints/
 .env
+
+# Internal & Legacy Archival
+delsoon/
+COMP_SUMMARY.md
+COMP.md
