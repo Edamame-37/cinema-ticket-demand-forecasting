@@ -1,6 +1,6 @@
 ---
 name: Kaggle Pipeline Executor
-description: Guides the agent on how to autonomously execute Kaggle competitions iteratively using a single End-to-End notebook template and proper Local CV tracking.
+description: Guides the agent on how to autonomously execute Kaggle competitions iteratively using a single End-to-End notebook template, Advanced ML Engineering practices, and proper Local CV tracking.
 ---
 
 # Kaggle Autonomous Execution Protocol
@@ -22,75 +22,86 @@ Before starting the experimentation loop, you must establish the data foundation
 
 1. **Create `starting/EDA.ipynb` (Foundational EDA)**:
    You MUST structure this notebook strictly into these specific modules for ANY dataset:
-   - **M1: Setup (Skema Tabel)**: Do NOT use `df.head()` or `df.info()`. Instead, you MUST create and display a `pd.DataFrame` containing the Dataset Schema (SQL 'DESCRIBE' style). The columns must be: `#` (Index), `Fitur` (Column Name), `Tipe Data` (dtypes), `Contoh Data` (first row data), and `Keterangan` (a clear description of what the feature represents). Render this for BOTH Train and Test datasets separately. You MUST set `pd.set_option('display.max_colwidth', None)` to prevent text truncation.
-   - **M2: Analisis Ringkasan & Entity Overlap**: Render descriptive statistics by explicitly splitting them into three distinct DataFrames based on data types: (1) **Kuantitatif** (Continuous variables), (2) **Kategorikal** (Nominal variables), and (3) **Ordinal** (Discrete ranking variables). Use `display()` for each. **CRITICAL:** For Ordinal statistics, do NOT include percentile rows (`25%`, `50%`, `75%`); use `.drop(['25%', '50%', '75%'])`. Then, create a merged DataFrame showcasing the exact missing values count and percentages for BOTH Train and Test datasets side-by-side. **MANDATORY**: You MUST calculate and explicitly print the overlap percentage of the primary categorical entities (e.g., `movie_title`, `user_id`, `store_id`) between Train and Test to dictate your Validation Strategy later (KFold vs GroupKFold).
-   - **M2: Inspeksi Baris Bermasalah (CRITICAL)**: You MUST create a dedicated markdown & code section for EVERY single feature to inspect anomalies.
-     - In the Markdown cell, write a highly descriptive paragraph explaining the feature's significance, why anomalies/misvalues matter here, and what logic applies.
-     - In the Code cell, check for anomalies based on the domain logic (e.g., negative values for prices, invalid categories). **CRITICAL RULE**: Null/NaN values MUST be included as part of misvalues. Use the logical OR operator (e.g., `condition | df['Feature'].isnull()`) so that empty rows and wrongly formatted rows are captured together.
-     - You MUST print out the exact array/list of offending indices or primary keys (ID) completely without limits (e.g., `print(df[anomaly]['ID_Column'].tolist())`). Do NOT render full DataFrames (like `.head()`) here to prevent visual clutter and crashes.
-   - **M2: Visualisasi Data Dasar**: You MUST visualize EVERY SINGLE FEATURE (except primary keys or useless ID strings) against the target variable (e.g., `hue='Target'`).
-     - Split every single plot into its own dedicated Markdown and Code cell.
-     - In the Markdown cell, explicitly write down your hypothesis, the business logic, and the significance of the upcoming plot.
-     - For high cardinality categorical features, you must limit the plot to the Top N most frequent values (e.g., `value_counts().iloc[:30].index`) to prevent kernel crashes and unreadable charts.
+   - **M1: Setup (Skema Tabel)**: Do NOT use `df.head()` or `df.info()`. Instead, create a `pd.DataFrame` containing the Dataset Schema (SQL 'DESCRIBE' style). Columns: `#` (Index), `Fitur` (Column Name), `Tipe Data` (dtypes), `Contoh Data` (first row data), and `Keterangan` (description). Render for BOTH Train and Test datasets separately. Use `pd.set_option('display.max_colwidth', None)`.
+   - **M2: Analisis Ringkasan, Distribusi & Uji Kenormalan**: Render descriptive statistics explicitly split by type: (1) **Kuantitatif** (Continuous), (2) **Kategorikal** (Nominal), and (3) **Ordinal** (Discrete).
+     - **CRITICAL (Distribution Analytics)**: For Quantitative data, you MUST calculate and display **Skewness** and **Kurtosis**. Evaluate the proximity of the **Mean vs Median**. 
+     - **CRITICAL (Correlation Analytics)**: Before testing correlation, test normality (e.g. using Shapiro-Wilk on a sample). Use Pearson only if normal, otherwise use Spearman/Kendall.
+     - **CRITICAL**: For Ordinal stats, do NOT include percentile rows; use `.drop(['25%', '50%', '75%'])`.
+     - **MANDATORY (Entity Overlap)**: Calculate and print the overlap percentage of primary categorical entities (e.g., `movie_title`) between Train and Test to dictate Validation Strategy (KFold vs GroupKFold).
+   - **M2: Inspeksi Anomali & Ekstrem Missing Values (CRITICAL)**: Create a dedicated section for EVERY feature to inspect anomalies.
+     - **Triase Missing Values (MCAR/MAR/MNAR)**: You MUST diagnose the missingness mechanism:
+       1. **MCAR (Missing Completely at Random):** If truly random, leave it blank temporarily (for tree models) or fill with domain knowledge.
+       2. **MAR (Missing at Random - Berpola):** If patterned, impute based on trend/pattern but BOUND the values using Standard Deviation (STD) to prevent artificial outliers.
+       3. **MNAR (Bergantung Kolom Lain):** If missingness correlates with other columns, analyze the distribution of those related features to reconstruct the missing values logically.
+     - In Code cells, check for anomalies based on domain logic. Null/NaN values MUST be included in misvalues (use `| df['Feature'].isnull()`). Print the exact array of offending indices completely (e.g., `df[anomaly]['ID_Column'].tolist()`). Do NOT render full DataFrames (`.head()`).
+   - **M2: Visualisasi Data Dasar**: Visualize EVERY SINGLE FEATURE against the target variable. Include Markdown explaining the hypothesis. Limit high-cardinality categorical plots to Top 30.
 
 2. **Create `starting/preprocessing.ipynb` (Foundational Preprocessing)**:
-   You MUST perform basic data cleaning, handling missing values, and imputation for ANY dataset. Address the anomalies and missing values found in `EDA.ipynb` with strict rules:
    - **Data Merging**: Combine Train and Test datasets first to ensure consistent imputation mappings, then split them back at the end.
-   - **Missing Values Imputation**: Implement imputation based on the feature's context (e.g., mode for low-cardinality nominals, median grouped by a related feature for continuous data, or a constant like 'Unknown' for high-null columns). For crucial features with high missing rates, you MUST attempt to extract proxy information from other columns to group the medians/means (e.g., extracting Titles from Names to impute Age). Do NOT drop proxy features if they hold predictive value.
+   - **Missing Values Imputation**: Implement the imputation logic decided in the EDA phase based on MCAR/MAR/MNAR diagnosis. 
+   - **Pembersihan NLP Dasar (Teks/Scraping)**: For text or scraped data, you MUST aggressively clean the data: remove emojis/emoticons, strip stop words, lowercase, and handle punctuation before moving to advanced NLP steps.
    - **Data Cleaning & Formatting**: Standardize data types. Apply rounding rules if floating points realistically represent discrete concepts.
-   - **Anomaly Handling**: Make deliberate decisions on logical anomalies found during EDA. Document explicitly whether you impute them or intentionally leave them as-is based on historical/domain assumptions.
-   - **Documentation**: EVERY imputation and cleaning step MUST be preceded by a Markdown cell explaining the assumption and logical reasoning.
-   - **Output**: Split the data back and save the final cleaned data exactly as `dataset/cleaned_train.csv` and `dataset/cleaned_test.csv`.
+   - **Documentation**: EVERY imputation and cleaning step MUST be preceded by a Markdown cell explaining the logical reasoning.
+   - **Output**: Split the data back and save exactly as `dataset/cleaned_train.csv` and `dataset/cleaned_test.csv`.
 
 ## Phase 3: Autonomous Experimentation Loop
 You are strictly forbidden from modifying `Experiment_Template.ipynb`. Instead, you must iterate.
 
+**Aturan Eksekusi Global (Global Execution Rules)**:
+1. **Validasi Mandiri per Tahapan (*Milestone Self-Check*):** AI MUST immediately check, verify, and reflect on the output (`print`/`plot`) of each milestone right after executing it. Do not proceed to the next milestone if the current results are illogical.
+2. **Independensi Sel Kode (*Independent Cell Execution*):** Every Jupyter Notebook cell MUST be designed to be executed independently. Implement safety guards (e.g. `if 'df' not in locals(): load_data()`) to prevent `NameError`. The user should never be forced to click "Run All".
+3. **Reproduksibilitas Absolut (Deterministik & *Random Seed*):**
+   - AI MUST **ALWAYS** pass a random seed (e.g., `random_state=42`) to ALL stochastic functions (`KFold`, model initialization, `train_test_split`, `sampling`, `PCA`, etc.).
+   - **Python Hash Randomization:** MUST explicitly disable Python's internal hash randomization programmatically at the very top of the notebook: `os.environ['PYTHONHASHSEED'] = '0'`.
+   - **GPU Determinism:** If utilizing GPU (PyTorch, TensorFlow, or CUDA parameters in Tree models), MUST enforce absolute determinism (e.g., `torch.backends.cudnn.deterministic = True`, `torch.backends.cudnn.benchmark = False`).
+
 **For every new iteration/idea (Trial & Error):**
-1. **Create a Dedicated Folder**: Create a new folder under the `experiments/` directory named exactly after your experiment (e.g., `experiments/Exp02_OptunaTuning/`). The workspace MUST follow this exact structure:
-   ```text
-   experiments/
-   ├── Exp<XX>_<Name>/
-   │   ├── Exp<XX>_<Name>.ipynb
-   │   ├── model.pkl/other model (optional)
-   │   ├── submission.csv (optional)
-   │   └── cv_score.txt (optional)
-   ```
-2. **Duplicate/Create Notebook**: Duplicate the `Experiment_Template.ipynb` (or previous best notebook) and place it **inside** this new folder. Name it identically to the folder (e.g., `experiments/Exp02_OptunaTuning/Exp02_OptunaTuning.ipynb`). DO NOT leave notebooks scattered in the root or `notebooks/` directory.
-2. **Analysis & Strategy (Pre-Coding)**: Open the new notebook and explicitly document your analysis. You MUST explain the problem definition, analyze what needs to be done based on the dataset, and justify your algorithm/methodology selection before writing any code. Every experiment notebook MUST start by loading the `dataset/cleaned_train.csv` generated from `starting/preprocessing.ipynb`.
-3. **Execution & Comprehensive Documentation (SUPER GRANULAR INTERACTIVE STEPS)**:
-   You are **STRICTLY FORBIDDEN** from completing the entire experiment in a single response. You MUST break down your execution into the following 11 iterative milestones. After completing a milestone, you MUST stop, present your detailed findings to the user, and explicitly ask for permission to proceed to the next milestone.
+1. **Create a Dedicated Folder**: e.g., `experiments/Exp02_OptunaTuning/`.
+2. **Duplicate/Create Notebook**: Place identically named notebook inside the new folder.
+3. **Analysis & Strategy (Pre-Coding)**: Explicitly document problem definition, analysis, and algorithm selection before coding. Always start by loading `dataset/cleaned_train.csv`.
+4. **Execution & Comprehensive Documentation (SUPER GRANULAR INTERACTIVE STEPS)**:
+   You MUST break down your execution into the 11 iterative milestones. Pause and present findings after EACH milestone.
 
-   **Notebook Execution Integrity (Safety Guards & Independent Cells)**:
-   When injecting or modifying cells, ensure strict sequential integrity but ALSO design for flexibility. **Ensure the notebook is designed so that critical cells (Training, Tuning, Validation, Inference) can be run independently (per cell)** without forcing the user to always use "Run All". Add Python safety guards (`if 'X' not in locals():`, or re-loading data if missing) to independent code cells to prevent `NameError` if the user runs them out of order. ALWAYS instruct the user clearly if they just need to run a specific cell or the entire notebook.
-
-   **The 11 Iterative Milestones:**
-   - **M1: Post-Preprocessing EDA** (Load `cleaned_train.csv` and conduct EDA to prepare and discover ideas for Information Extraction and Feature Engineering)
-   - **M2: Ekstraksi Informasi** (Extract deep insights and patterns from the existing variables based on M1)
-   - **M3: Rekayasa Fitur (Feature Engineering)** (Create new features based on the insights from M2. **CRITICAL (Calendar Physics)**: If dealing with time-series or date data, you MUST extract holidays, weekends, and payday indicators as real-world physics heavily dictate trends).
-   - **M4: Post-FE EDA** (Analyze the correlation and distribution of the newly engineered features. **CRITICAL:** You MUST evaluate these new features against findings/results from previous experiments to maximize the potential score improvements)
-   - **M5: Pemodelan (Machine Learning / Deep Learning)** (Select and train a baseline algorithm/model using the finalized feature set. **CRITICAL (Metric Alignment)**: Your Loss Function/Objective MUST perfectly align mathematically with the Kaggle Evaluation Metric (e.g., L1 Loss for MAE/MASE, RMSE on `log1p(y)` for RMSLE). Use `sample_weight` if you scale targets but need to preserve the raw evaluation metric scale).
-   - **M6: Efisiensi Algoritma** (Perform hyperparameter tuning or model optimization to increase efficiency and accuracy. **CRITICAL (Anti-Overfitting Physics)**: For Tree-based models on time-series decay, explicitly consider applying `monotone_constraints` to prevent the model from learning impossible random spikes).
-   - **M7: Validasi Model** (Set up and execute a strict validation strategy. **CRITICAL (Entity Protection)**: If your Phase 1/2 overlap check shows the Test set contains *Unseen Entities*, you are STRICTLY FORBIDDEN from using standard KFold. You MUST use **GroupKFold** based on that entity ID to prevent fatal data leakage and LB shake-ups).
-   - **M8: Evaluasi Model** (Analyze performance metrics, loss curves, confusion matrices, and error analysis. **CRITICAL (Irreducible Error Check)**: If struggling to reach a goal, you should overfit a simple model temporarily (e.g. training without GroupKFold) to find the absolute minimum possible error. This defines the mathematical 'Irreducible Error' boundary and tells you if the Kaggle Goal is realistically possible without external data).
-   - **M9: Prediction** (**CRITICAL:** You MUST verify 100% column parity between `X` and `X_test`. If `test.csv` is missing features or has different columns, you MUST reconstruct them using auxiliary datasets or perform safe imputation BEFORE generating predictions).
-   - **M10: Submission** (Save predictions to a `.csv` file. DO NOT AUTO-SUBMIT. Present the file to the user and ask for explicit permission before submitting to Kaggle)
-   - **M11: Rekapitulasi Evaluasi & Analisis Skor Kaggle** (Create a final cell to explicitly log and compare the Local CV Score against the actual Kaggle LB Score).
-
-   **CRITICAL RULE**: Do NOT complete multiple milestones at once. Pause after EVERY milestone!
-4. **Scoring**: You must print out the final overall **Local CV Score** at the end of M8.
+   - **M1: Post-Preprocessing EDA**
+   - **M2 & M3: Ekstraksi Informasi & Rekayasa Fitur (Feature Engineering)**
+     - **Top Words Extraction:** For NLP/text data, extract and display the most frequent words from the cleaned text. Use them as features (e.g., TF-IDF or boolean flags).
+     - **KNN Sentiment Thresholding:** For sentiment analysis, extract sentiment vectors, compute similarity using K-Nearest Neighbors (KNN), determine an optimal observation threshold empirically, and drop/trim noisy outlier data above this threshold.
+     - **Backtranslation:** For text scraping data, enforce data augmentation using back-translation to increase robustness.
+     - **Calendar Physics:** Extract holidays, weekends, and payday indicators for time-series data.
+   - **M4: Post-FE EDA & Uji Keragaman (Diversity Check)**
+     - Evaluate the correlation, distribution, and **Diversity (Keragaman)** of newly engineered features. If a feature is too homogeneous (no variance), discard it. Evaluate features against previous experiments.
+   - **M5: Pemodelan (Machine Learning / Deep Learning)**
+     - Select and train a baseline algorithm using the finalized feature set.
+     - **Metric Alignment:** Loss Function MUST align with the Kaggle Metric (e.g. L1 for MASE).
+     - **Transparansi Hasil Iterasi:** (See rules in M7).
+   - **M6: Efisiensi Algoritma & Parameter Dasar**
+     - **Baseline Parameters:** Before blindly tuning (Optuna/GridSearch), you MUST analytically calculate and evaluate the nearest/baseline parameters (e.g., sensible learning rates, tree depths based on data size).
+     - **Anti-Overfitting Physics:** Apply `monotone_constraints` on time-series decay.
+   - **M7: Validasi Model & Transparansi Multidimensi**
+     - **Trial & Error Fold Size:** Do NOT immediately jump to large K-Folds (e.g. K=10). Start with small folds (e.g. K=3, K=5), observe variance, and adjust empirically.
+     - **Entity Protection:** Use GroupKFold if unseen entities exist.
+     - **CRITICAL (Transparansi Pelatihan per Iterasi/Fold):** AI **MUST EXPLICITLY PRINT** the following 7 metrics side-by-side at the END OF EVERY SINGLE ITERATION/FOLD (Do NOT use "for example", you MUST print EXACTLY these):
+       1. **MASE (Mean Absolute Scaled Error)**
+       2. **MAE (Mean Absolute Error)**
+       3. **RMSE (Root Mean Squared Error)**
+       4. **RMSLE (Root Mean Squared Logarithmic Error)**
+       5. **MAPE (Mean Absolute Percentage Error)**
+       6. **R² Score**
+       7. **Feature Importance (Keberpengaruhan Fitur):** Print the ordered list of features and their absolute importance weights/scores used in that specific fold.
+     - **Rekapitulasi Akhir Absolut:** At the very end of the training execution cell, AI **MUST RE-PRINT** the final aggregated averages for ALL 6 exact metrics above, AND the final aggregated Feature Importance rankings so the user can see everything without scrolling up.
+   - **M8: Evaluasi Kritis Ketergantungan Model (Bias vs Variance)**
+     - **Learning Curves (Diagnosa):** You MUST plot the Learning Curve (Accuracy/Loss of Train vs Validation). If both are poor: **Bias (Underfitting)**. If Train is perfect but Validation diverges: **Variance (Overfitting)**.
+     - **Ablation Study (Uji Dominansi):** Look at the Feature Importance from M7. If a feature is overwhelmingly dominant, you MUST run a retraining experiment **WITHOUT** that dominant feature to check for Data Leakage or over-reliance.
+     - **Irreducible Error Check:** Overfit a simple model (without GroupKFold) to find the mathematical minimum error boundary.
+   - **M9: Prediction** (Verify 100% column parity between `X` and `X_test`).
+   - **M10: Submission** (Save to `.csv`, DO NOT AUTO-SUBMIT).
+   - **M11: Rekapitulasi Evaluasi & Analisis Skor Kaggle** (Compare Local CV vs Kaggle LB).
 
 ## Phase 4: Submission Rules (NO AUTO-SUBMIT)
-Kaggle has strict daily submission limits. You are **STRICTLY FORBIDDEN** from automatically submitting predictions to Kaggle.
-
-- Always rely on your Local CV score to evaluate your model.
-- Save the predictions as a `.csv` file and present the CV score to the user.
-- **DO NOT AUTO-SUBMIT**. Wait for the user's explicit command before using the Kaggle API to submit.
-- If the user doesn't want to submit, simply log the CV score into `AI_LAB_BOOK.md` and move to the next iteration.
+- Wait for the user's explicit command before using the Kaggle API to submit.
 
 ## Phase 5: Logging
-After every experiment (whether submitted or not), you MUST open `AI_LAB_BOOK.md` and log:
-1. **Summary Table**: Update the `## Experiment Logs` table with the Notebook Name, Local CV Score, Public LB Score, and short notes.
-2. **Feature Engineering Ideas Backlog (CRITICAL)**: You MUST systematically deduce and write down actionable, concrete ideas for the *next* experiment based on current limitations or errors (e.g., new feature combinations, fixing data leakage, changing algorithms).
-3. **Detailed Stage-by-Stage Logging (CRITICAL)**: You MUST write comprehensive, stage-by-stage notes under the `## Detailed Experiment Notes` section. Group all findings by their Experiment ID (e.g., `### Exp01_Baseline`). Do not just rely on the notebook; the Lab Book must summarize the entire thought process and results for each stage (from EDA to Submission) sequentially before you move on to the next experiment.
-
-Repeat Phase 3 to Phase 5 until the user stops you or you reach the goal!
+After every experiment, update `AI_LAB_BOOK.md`:
+1. **Summary Table**: Log Name, Local CV, Public LB, Notes.
+2. **Feature Engineering Ideas Backlog (CRITICAL)**: Deduce actionable ideas for the next experiment.
+3. **Detailed Stage-by-Stage Logging (CRITICAL)**: Write comprehensive sequential notes.
