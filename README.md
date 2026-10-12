@@ -72,39 +72,41 @@ The pipeline ingests unjoined, cleaned relational datasets structured as follows
   'theme': 'base',
   'themeVariables': {
     'background': 'transparent',
-    'mainBkg': 'transparent',
-    'nodeBorder': '#388bfd',
-    'clusterBkg': 'transparent',
-    'clusterBorder': '#30363d',
-    'lineColor': '#58a6ff',
-    'textColor': '#e6edf3',
-    'primaryColor': 'transparent',
-    'primaryTextColor': '#e6edf3',
-    'primaryBorderColor': '#388bfd',
-    'secondaryColor': 'transparent',
-    'secondaryTextColor': '#e6edf3',
-    'secondaryBorderColor': '#238636',
-    'tertiaryColor': 'transparent',
-    'tertiaryTextColor': '#e6edf3',
-    'tertiaryBorderColor': '#a371f7'
+    'mainBkg': '#ffffff',
+    'nodeBorder': '#0969da',
+    'clusterBkg': '#f6f8fa',
+    'clusterBorder': '#0969da',
+    'lineColor': '#0969da',
+    'textColor': '#0f172a',
+    'titleColor': '#0969da',
+    'primaryColor': '#ffffff',
+    'primaryTextColor': '#0f172a',
+    'primaryBorderColor': '#0969da',
+    'secondaryColor': '#ffffff',
+    'secondaryTextColor': '#0f172a',
+    'secondaryBorderColor': '#1a7f37',
+    'tertiaryColor': '#ffffff',
+    'tertiaryTextColor': '#0f172a',
+    'tertiaryBorderColor': '#8250df',
+    'fontSize': '13px'
   }
 }}%%
 flowchart LR
-    subgraph S1 ["1. Data & Preprocessing"]
-        A["<b>Ingestion & Normalization</b><br/>• Title Regex Normalization<br/>• Relational Metadata Joins<br/>• Scale Extraction (S_p)"]
-        --> B["<b>Feature Matrix Assembly</b><br/>• Calendar Dynamics (DOW, Weekend)<br/>• Sentiment & Net WOM Signals<br/>• Weather Penalty (Precip × W/E)<br/>• Temporal Position (Day 4–10)"]
+    subgraph S1 ["<b style='color:#0969da;font-size:14px'>1. Data & Preprocessing</b>"]
+        A["<b style='color:#0f172a;font-size:13px'>Ingestion & Normalization</b><br/><span style='color:#334155'>• Title Regex Normalization<br/>• Relational Metadata Joins<br/>• Scale Extraction (S_p)</span>"]
+        --> B["<b style='color:#0f172a;font-size:13px'>Feature Matrix Assembly</b><br/><span style='color:#334155'>• Calendar Dynamics (DOW, Weekend)<br/>• Sentiment & Net WOM Signals<br/>• Weather Penalty (Precip × W/E)<br/>• Temporal Position (Day 4–10)</span>"]
     end
 
-    subgraph S2 ["2. Cross-Validation & Modeling"]
-        B --> C["<b>Strict CV Strategy</b><br/>5-Fold GroupKFold (by Title)<br/>Zero Out-of-Sample Leakage"]
-        C --> D1["<b>LightGBM Regressor</b><br/>• Unweighted L1 Ratio Loss (y/S_p)<br/>• Categorical Regularization"]
-        C --> D2["<b>XGBoost Regressor</b><br/>• Monotonic Lifespan Decay (-1)<br/>• WOM Sentiment Direction (+1)"]
+    subgraph S2 ["<b style='color:#0969da;font-size:14px'>2. Cross-Validation & Modeling</b>"]
+        B --> C["<b style='color:#0f172a;font-size:13px'>Strict CV Strategy</b><br/><span style='color:#334155'>5-Fold GroupKFold (by Title)<br/>Zero Out-of-Sample Leakage</span>"]
+        C --> D1["<b style='color:#0f172a;font-size:13px'>LightGBM Regressor</b><br/><span style='color:#334155'>• Unweighted L1 Ratio Loss (y/S_p)<br/>• Categorical Regularization</span>"]
+        C --> D2["<b style='color:#0f172a;font-size:13px'>XGBoost Regressor</b><br/><span style='color:#334155'>• Monotonic Lifespan Decay (-1)<br/>• WOM Sentiment Direction (+1)</span>"]
     end
 
-    subgraph S3 ["3. Blending & Production"]
-        D1 --> E["<b>SLSQP Meta-Optimization</b><br/>• Constrained L1 Solver<br/>• Convex Ensembling"]
+    subgraph S3 ["<b style='color:#0969da;font-size:14px'>3. Blending & Production</b>"]
+        D1 --> E["<b style='color:#0f172a;font-size:13px'>SLSQP Meta-Optimization</b><br/><span style='color:#334155'>• Constrained L1 Solver<br/>• Convex Ensembling</span>"]
         D2 --> E
-        E --> F["<b>Final Inference</b><br/>Tickets = Predicted Ratio × S_p"]
+        E --> F["<b style='color:#0f172a;font-size:13px'>Final Inference</b><br/><span style='color:#334155'>Tickets = Predicted Ratio × S_p</span>"]
     end
 ```
 
