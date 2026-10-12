@@ -67,47 +67,27 @@ The pipeline ingests unjoined, cleaned relational datasets structured as follows
 
 ## 4. Modeling Methodology
 
-```
-+-------------------------------------------------------------+
-|               Data Ingestion & Normalization                |
-|  - Title Regex Normalization & 100% Relational Metadata Join |
-|  - Opening Profile Extraction (S_p, D3/D1 Ratio, Capacity)  |
-+-------------------------------------------------------------+
-                               |
-                               v
-+-------------------------------------------------------------+
-|                  Feature Matrix Assembly                    |
-|  - Calendar Dynamics (Day of Week, Weekend, Holidays)       |
-|  - Sentiment Signals (TMDB Rating, Net WOM Sentiment)       |
-|  - Meteorological Penalty (Precipitation x Weekend)         |
-|  - Relative Temporal Position (Days Elapsed Since Release)  |
-+-------------------------------------------------------------+
-                               |
-                               v
-+-------------------------------------------------------------+
-|            Strict Cross-Validation Architecture             |
-|   5-Fold GroupKFold Partitioned by Unique Movie Titles      |
-+-------------------------------------------------------------+
-                               |
-                               v
-+-------------------------------------------------------------+
-|                Constrained Gradient Boosting                |
-|  - LightGBM Regressor (L1 Objective, Cat-Smooth Regularizer)|
-|  - XGBoost Regressor (Monotone Decreasing Lifespan Decay)   |
-+-------------------------------------------------------------+
-                               |
-                               v
-+-------------------------------------------------------------+
-|              SLSQP Meta-Optimization & Blending             |
-|  - Sequential Least Squares Programming Weight Calibration  |
-|  - Convex Multi-Model Variance Reduction Blending           |
-+-------------------------------------------------------------+
-                               |
-                               v
-+-------------------------------------------------------------+
-|                  Final Demand Inference                     |
-|      Scale Multiplication: Total Tickets = Ratio x S_p      |
-+-------------------------------------------------------------+
+```mermaid
+flowchart TD
+    A["<b>Data Ingestion & Normalization</b><br/>• Title Regex Normalization & Relational Join<br/>• Opening Profile Extraction (S_p, D3/D1, Capacity)"]
+    --> B["<b>Feature Matrix Assembly</b><br/>• Calendar Dynamics (Day of Week, Weekend, Holidays)<br/>• Sentiment Signals (TMDB Rating, Net WOM Sentiment)<br/>• Meteorological Penalty (Precipitation × Weekend)<br/>• Relative Temporal Position (Days Elapsed Since Release)"]
+    --> C["<b>Strict Cross-Validation Architecture</b><br/>5-Fold GroupKFold Partitioned by Unique Movie Titles"]
+    
+    C --> D1["<b>LightGBM Regressor</b><br/>• Unweighted L1 / MAE Objective<br/>• Target Ratio Formulation: r = y / S_p<br/>• Categorical Smoothing Regularizer"]
+    C --> D2["<b>XGBoost Regressor</b><br/>• Strict Monotonic Constraints (-1 on Elapsed Days)<br/>• Word-of-Mouth Decay Damping"]
+    
+    D1 --> E["<b>SLSQP Meta-Optimization & Blending</b><br/>• Sequential Least Squares Programming Calibration<br/>• Convex Variance-Reduction Multi-Model Ensemble"]
+    D2 --> E
+    
+    E --> F["<b>Final Demand Inference</b><br/>Scale Reconstruction: Total Tickets = Ratio × S_p"]
+
+    style A fill:#f8fafc,stroke:#64748b,stroke-width:1px
+    style B fill:#f8fafc,stroke:#64748b,stroke-width:1px
+    style C fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
+    style D1 fill:#f0fdf4,stroke:#22c55e,stroke-width:1px
+    style D2 fill:#f0fdf4,stroke:#22c55e,stroke-width:1px
+    style E fill:#faf5ff,stroke:#a855f7,stroke-width:2px
+    style F fill:#fff7ed,stroke:#f97316,stroke-width:2px
 ```
 
 ### 4.1 Domain-Guided Monotonic Constraints
@@ -175,7 +155,7 @@ The repository enforces strict separation of concerns and standard file naming p
     ├── Exp03_MetaEnsemble_NLPPCA/             # Exp03 notebook and submission artifact
     ├── Exp04_LogMonotonic/                    # Exp04 notebook and submission artifact
     ├── Exp05_StackingEnsemble/                # Exp05 notebook and submission artifact
-    ├── Exp06_StrictCausalityStacking/          # Exp06 notebook and submission artifact
+    ├── Exp06_StrictCausalityStacking/         # Exp06 notebook and submission artifact
     ├── Exp07_RatioTargeting_FeaturePruning/   # Exp07 notebook and submission artifact
     ├── Exp08_DeepLearningEmbeddings/          # Exp08 notebook and submission artifact
     ├── Exp09_HybridBlending/                  # Exp09 notebook and submission artifact
